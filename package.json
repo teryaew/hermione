@@ -43,19 +43,7 @@
     "qemitter": "^1.1.0",
     "teamcity-service-messages": "^0.1.6",
     "urijs": "^1.17.0",
-    "webdriverio": "^4.6.1",
-    "bem-page-object": "0.1.4",
-    "console-notifier": "1.0.0",
-    "hermione-assert-metrics": "2.0.0",
-    "hermione-faildump": "1.0.1",
-    "hermione-j2js-coverage": "0.1.5",
-    "hermione-serp-reporter": "1.9.4",
-    "hermione-templar": "6.6.0",
-    "hermione-url-decorator": "1.0.2",
-    "lodash": "3.10.1",
-    "palmsync": "0.12.1",
-    "skip-validator": "1.1.0",
-    "stat-reporter": "0.1.0"
+    "webdriverio": "^4.6.1"
   },
   "devDependencies": {
     "chai": "^3.4.1",

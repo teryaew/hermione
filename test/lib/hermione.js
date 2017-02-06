@@ -4,6 +4,8 @@ const _ = require('lodash');
 const EventEmitter = require('events').EventEmitter;
 const pluginsLoader = require('plugins-loader');
 const q = require('q');
+const QEmitter = require('qemitter');
+
 const Config = require('../../lib/config');
 const Hermione = require('../../lib/hermione');
 const RunnerEvents = require('../../lib/constants/runner-events');
@@ -61,7 +63,7 @@ describe('hermione', () => {
         const runHermione = (paths, opts) => Hermione.create().run(paths, opts);
 
         const mkRunnerStub_ = (runFn) => {
-            const runner = new EventEmitter();
+            const runner = new QEmitter();
 
             runner.run = sandbox.stub(Runner.prototype, 'run', runFn && runFn.bind(null, runner));
             sandbox.stub(Runner, 'create').returns(runner);
@@ -184,17 +186,44 @@ describe('hermione', () => {
         });
 
         describe('should passthrough', () => {
-            it('all runner events', () => {
+            const asyncEvents = [
+                RunnerEvents.RUNNER_START,
+                RunnerEvents.RUNNER_END,
+                RunnerEvents.SESSION_START,
+                RunnerEvents.SESSION_END,
+                RunnerEvents.EXIT
+            ];
+
+            const syncEvents = _(RunnerEvents).values().difference(asyncEvents).value();
+
+            it('all synchronous runner events', () => {
                 const runner = mkRunnerStub_();
                 const hermione = Hermione.create(makeConfigStub());
 
                 return hermione.run()
                     .then(() => {
-                        _.forEach(_.omit(hermione.events, 'EXIT'), (event, name) => {
+                        _.forEach(syncEvents, (event, name) => {
                             const spy = sinon.spy().named(`${name} handler`);
                             hermione.on(event, spy);
 
                             runner.emit(event);
+
+                            assert.calledOnce(spy);
+                        });
+                    });
+            });
+
+            it('all asynchronous runner events', () => {
+                const runner = mkRunnerStub_();
+                const hermione = Hermione.create(makeConfigStub());
+
+                return hermione.run()
+                    .then(() => {
+                        _.forEach(asyncEvents, (event, name) => {
+                            const spy = sinon.spy().named(`${name} handler`);
+                            hermione.on(event, spy);
+
+                            runner.emitAndWait(event);
 
                             assert.calledOnce(spy);
                         });

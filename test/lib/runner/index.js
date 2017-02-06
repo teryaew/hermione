@@ -3,6 +3,7 @@
 const q = require('q');
 const _ = require('lodash');
 const EventEmitter = require('events').EventEmitter;
+const utils = require('qemitter/utils');
 
 const BrowserAgent = require('../../../lib/browser-agent');
 const BrowserPool = require('../../../lib/browser-pool');
@@ -166,48 +167,75 @@ describe('Runner', () => {
                     assert.called(secondResolveMarker);
                 });
         });
-
-        describe('if one of mocha runners failed', () => {
+        describe('Mocha runners', () => {
             let mochaRunner;
 
             beforeEach(() => {
                 mochaRunner = mkMochaRunner();
-
-                const runner = new Runner(makeConfigStub());
-                return run_({runner});
             });
 
-            it('should submit failed tests for retry', () => {
-                mochaRunner.emit(RunnerEvents.TEST_FAIL, 'some-error');
-
-                assert.calledOnce(RetryManager.prototype.handleTestFail);
-                assert.calledWith(RetryManager.prototype.handleTestFail, 'some-error');
-            });
-
-            it('should submit errors for retry', () => {
-                mochaRunner.emit(RunnerEvents.ERROR, 'some-error', 'some-data');
-
-                assert.calledOnce(RetryManager.prototype.handleError);
-                assert.calledWith(RetryManager.prototype.handleError, 'some-error', 'some-data');
-            });
-        });
-
-        it('should passthrough events from mocha runners', () => {
-            const mochaRunner = mkMochaRunner();
-            const runner = new Runner(makeConfigStub());
-            const onTestPass = sandbox.spy().named('onTestPass');
-
-            runner.on(RunnerEvents.TEST_PASS, onTestPass);
-            return run_({runner})
-                .then(() => {
-                    mochaRunner.emit(RunnerEvents.TEST_PASS);
-
-                    assert.called(onTestPass);
+            describe('if one of mocha runners failed', () => {
+                beforeEach(() => {
+                    const runner = new Runner(makeConfigStub());
+                    return run_({runner});
                 });
+
+                it('should submit failed tests for retry', () => {
+                    mochaRunner.emit(RunnerEvents.TEST_FAIL, 'some-error');
+
+                    assert.calledOnce(RetryManager.prototype.handleTestFail);
+                    assert.calledWith(RetryManager.prototype.handleTestFail, 'some-error');
+                });
+
+                it('should submit errors for retry', () => {
+                    mochaRunner.emit(RunnerEvents.ERROR, 'some-error', 'some-data');
+
+                    assert.calledOnce(RetryManager.prototype.handleError);
+                    assert.calledWith(RetryManager.prototype.handleError, 'some-error', 'some-data');
+                });
+            });
+
+            it('should passthrough events', () => {
+                const runner = new Runner(makeConfigStub());
+                const onTestPass = sandbox.spy().named('onTestPass');
+
+                runner.on(RunnerEvents.TEST_PASS, onTestPass);
+                return run_({runner})
+                    .then(() => {
+                        mochaRunner.emit(RunnerEvents.TEST_PASS);
+
+                        assert.called(onTestPass);
+                    });
+            });
+
+            it('should synchrony passthrough necessary events', () => {
+                const passEventsStub = sandbox.stub(utils, 'passthroughEvent');
+                const runner = new Runner(makeConfigStub());
+
+                return run_({runner})
+                    .then(() => {
+                        assert.calledWith(passEventsStub.secondCall,
+                            sinon.match.instanceOf(EventEmitter),
+                            sinon.match.instanceOf(Runner), [
+                                RunnerEvents.SUITE_BEGIN,
+                                RunnerEvents.SUITE_END,
+
+                                RunnerEvents.TEST_BEGIN,
+                                RunnerEvents.TEST_END,
+
+                                RunnerEvents.TEST_PASS,
+                                RunnerEvents.TEST_PENDING,
+
+                                RunnerEvents.INFO,
+                                RunnerEvents.WARNING
+                            ]
+                        );
+                    });
+            });
         });
 
         describe('passing of events from browser agent', () => {
-            beforeEach(() => sandbox.stub(BrowserAgent, 'create'));
+            beforeEach(() => sandbox.stub(BrowserAgent, 'create').returns(sinon.createStubInstance(BrowserAgent)));
 
             [RunnerEvents.SESSION_START, RunnerEvents.SESSION_END].forEach((event) => {
                 it(`should passthrough event ${event} from browser agent`, () => {
@@ -227,6 +255,22 @@ describe('Runner', () => {
                         });
                 });
             });
+
+            it('should asynchrony passthrough necessary events', () => {
+                const passEventsStub = sandbox.stub(utils, 'passthroughEventAsync');
+                const runner = new Runner(makeConfigStub());
+
+                return run_({runner})
+                    .then(() => {
+                        assert.calledWith(passEventsStub.firstCall,
+                            sinon.match.instanceOf(EventEmitter),
+                            sinon.match.instanceOf(Runner), [
+                                RunnerEvents.SESSION_START,
+                                RunnerEvents.SESSION_END
+                            ]
+                        );
+                    });
+            });
         });
 
         it('should start retry session after all', () => {
@@ -245,13 +289,12 @@ describe('Runner', () => {
                 retryMgr = new EventEmitter();
                 retryMgr.submitForRetry = sinon.stub();
                 RetryManager.prototype.__constructor.returns(retryMgr);
-
-                runner = new Runner(makeConfigStub());
             });
 
             it('should passthrough error event', () => {
                 const onError = sandbox.spy().named('onError');
 
+                runner = new Runner(makeConfigStub());
                 runner.on(RunnerEvents.ERROR, onError);
                 retryMgr.emit(RunnerEvents.ERROR);
 
@@ -261,6 +304,7 @@ describe('Runner', () => {
             it('should passthrough retry event', () => {
                 const onRetry = sandbox.spy().named('onRetry');
 
+                runner = new Runner(makeConfigStub());
                 runner.on(RunnerEvents.RETRY, onRetry);
                 retryMgr.emit(RunnerEvents.RETRY);
 
@@ -270,10 +314,27 @@ describe('Runner', () => {
             it('should passthrough test failed event', () => {
                 const onTestFail = sandbox.spy().named('onTestFail');
 
+                runner = new Runner(makeConfigStub());
                 runner.on(RunnerEvents.TEST_FAIL, onTestFail);
                 retryMgr.emit(RunnerEvents.TEST_FAIL);
 
                 assert.called(onTestFail);
+            });
+
+            it('should synchrony passthrough necessary events', () => {
+                const passEventsStub = sandbox.stub(utils, 'passthroughEvent');
+
+                new Runner(makeConfigStub()); // eslint-disable-line no-new
+
+                assert.calledWith(passEventsStub.firstCall,
+                    sinon.match.instanceOf(EventEmitter),
+                    sinon.match.instanceOf(Runner), [
+                        RunnerEvents.TEST_FAIL,
+                        RunnerEvents.SUITE_FAIL,
+                        RunnerEvents.ERROR,
+                        RunnerEvents.RETRY
+                    ]
+                );
             });
         });
 

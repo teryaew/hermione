@@ -193,7 +193,6 @@ describe('hermione', () => {
                 RunnerEvents.SESSION_END,
                 RunnerEvents.EXIT
             ];
-
             const syncEvents = _(RunnerEvents).values().difference(asyncEvents).value();
 
             it('all synchronous runner events', () => {
@@ -257,7 +256,7 @@ describe('hermione', () => {
                     .then(() => {
                         hermione.on('exit', onExit);
 
-                        signalHandler.emit('exit');
+                        signalHandler.emitAndWait('exit');
 
                         assert.calledOnce(onExit);
                     });

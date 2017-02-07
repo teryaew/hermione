@@ -2,7 +2,7 @@
 
 const q = require('q');
 const _ = require('lodash');
-const EventEmitter = require('events').EventEmitter;
+const QEmitter = require('qemitter');
 const utils = require('qemitter/utils');
 
 const BrowserAgent = require('../../../lib/browser-agent');
@@ -21,7 +21,7 @@ describe('Runner', () => {
     const mkMochaRunner = () => {
         sandbox.stub(MochaRunner, 'create');
 
-        const mochaRunner = new EventEmitter();
+        const mochaRunner = new QEmitter();
         mochaRunner.run = sandbox.stub().returns(q());
 
         MochaRunner.create.returns(mochaRunner);
@@ -167,8 +167,22 @@ describe('Runner', () => {
                     assert.called(secondResolveMarker);
                 });
         });
+
         describe('Mocha runners', () => {
             let mochaRunner;
+            const mochaRunnerEvents = [
+                RunnerEvents.SUITE_BEGIN,
+                RunnerEvents.SUITE_END,
+
+                RunnerEvents.TEST_BEGIN,
+                RunnerEvents.TEST_END,
+
+                RunnerEvents.TEST_PASS,
+                RunnerEvents.TEST_PENDING,
+
+                RunnerEvents.INFO,
+                RunnerEvents.WARNING
+            ];
 
             beforeEach(() => {
                 mochaRunner = mkMochaRunner();
@@ -197,38 +211,30 @@ describe('Runner', () => {
 
             it('should passthrough events', () => {
                 const runner = new Runner(makeConfigStub());
-                const onTestPass = sandbox.spy().named('onTestPass');
 
-                runner.on(RunnerEvents.TEST_PASS, onTestPass);
                 return run_({runner})
                     .then(() => {
-                        mochaRunner.emit(RunnerEvents.TEST_PASS);
+                        _.forEach(mochaRunnerEvents, (event, name) => {
+                            const spy = sinon.spy().named(`${name} handler`);
+                            runner.on(event, spy);
 
-                        assert.called(onTestPass);
+                            mochaRunner.emit(event);
+
+                            assert.calledOnce(spy);
+                        });
                     });
             });
 
-            it('should synchrony passthrough necessary events', () => {
+            it('should passthrough events from mocha runners synchronously', () => {
                 const passEventsStub = sandbox.stub(utils, 'passthroughEvent');
                 const runner = new Runner(makeConfigStub());
 
                 return run_({runner})
                     .then(() => {
                         assert.calledWith(passEventsStub.secondCall,
-                            sinon.match.instanceOf(EventEmitter),
-                            sinon.match.instanceOf(Runner), [
-                                RunnerEvents.SUITE_BEGIN,
-                                RunnerEvents.SUITE_END,
-
-                                RunnerEvents.TEST_BEGIN,
-                                RunnerEvents.TEST_END,
-
-                                RunnerEvents.TEST_PASS,
-                                RunnerEvents.TEST_PENDING,
-
-                                RunnerEvents.INFO,
-                                RunnerEvents.WARNING
-                            ]
+                            sinon.match.instanceOf(QEmitter),
+                            sinon.match.instanceOf(Runner),
+                            mochaRunnerEvents
                         );
                     });
             });
@@ -239,7 +245,7 @@ describe('Runner', () => {
 
             [RunnerEvents.SESSION_START, RunnerEvents.SESSION_END].forEach((event) => {
                 it(`should passthrough event ${event} from browser agent`, () => {
-                    const browserAgent = new EventEmitter();
+                    const browserAgent = new QEmitter();
                     const runner = new Runner(makeConfigStub());
                     const onEventHandler = sandbox.spy().named(event);
 
@@ -249,21 +255,21 @@ describe('Runner', () => {
 
                     return run_({runner})
                         .then(() => {
-                            browserAgent.emit(event);
+                            browserAgent.emitAndWait(event);
 
                             assert.called(onEventHandler);
                         });
                 });
             });
 
-            it('should asynchrony passthrough necessary events', () => {
+            it('should passthrough SESSION_START and SESSION_END events asynchronously', () => {
                 const passEventsStub = sandbox.stub(utils, 'passthroughEventAsync');
                 const runner = new Runner(makeConfigStub());
 
                 return run_({runner})
                     .then(() => {
                         assert.calledWith(passEventsStub.firstCall,
-                            sinon.match.instanceOf(EventEmitter),
+                            sinon.match.instanceOf(BrowserAgent),
                             sinon.match.instanceOf(Runner), [
                                 RunnerEvents.SESSION_START,
                                 RunnerEvents.SESSION_END
@@ -286,7 +292,7 @@ describe('Runner', () => {
             let runner;
 
             beforeEach(() => {
-                retryMgr = new EventEmitter();
+                retryMgr = new QEmitter();
                 retryMgr.submitForRetry = sinon.stub();
                 RetryManager.prototype.__constructor.returns(retryMgr);
             });
@@ -327,7 +333,7 @@ describe('Runner', () => {
                 new Runner(makeConfigStub()); // eslint-disable-line no-new
 
                 assert.calledWith(passEventsStub.firstCall,
-                    sinon.match.instanceOf(EventEmitter),
+                    retryMgr,
                     sinon.match.instanceOf(Runner), [
                         RunnerEvents.TEST_FAIL,
                         RunnerEvents.SUITE_FAIL,

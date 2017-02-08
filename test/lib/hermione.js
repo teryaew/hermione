@@ -1,10 +1,11 @@
 'use strict';
 
 const _ = require('lodash');
+const utils = require('qemitter/utils');
+const QEmitter = require('qemitter');
 const EventEmitter = require('events').EventEmitter;
 const pluginsLoader = require('plugins-loader');
 const q = require('q');
-const QEmitter = require('qemitter');
 
 const Config = require('../../lib/config');
 const Hermione = require('../../lib/hermione');
@@ -186,22 +187,13 @@ describe('hermione', () => {
         });
 
         describe('should passthrough', () => {
-            const asyncEvents = [
-                RunnerEvents.RUNNER_START,
-                RunnerEvents.RUNNER_END,
-                RunnerEvents.SESSION_START,
-                RunnerEvents.SESSION_END,
-                RunnerEvents.EXIT
-            ];
-            const syncEvents = _(RunnerEvents).values().difference(asyncEvents).value();
-
             it('all synchronous runner events', () => {
                 const runner = mkRunnerStub_();
                 const hermione = Hermione.create(makeConfigStub());
 
                 return hermione.run()
                     .then(() => {
-                        _.forEach(syncEvents, (event, name) => {
+                        _.forEach(RunnerEvents.SYNC, (event, name) => {
                             const spy = sinon.spy().named(`${name} handler`);
                             hermione.on(event, spy);
 
@@ -212,13 +204,29 @@ describe('hermione', () => {
                     });
             });
 
+            it('synchronous runner events before "Runner.run" called', () => {
+                const passEventsStub = sandbox.stub(utils, 'passthroughEvent');
+                const runner = mkRunnerStub_();
+                const hermione = Hermione.create(makeConfigStub());
+
+                return hermione.run()
+                    .then(() => {
+                        assert.calledWith(passEventsStub.firstCall,
+                            runner,
+                            sinon.match.instanceOf(Hermione),
+                            RunnerEvents.SYNC
+                        );
+                        assert.equal(passEventsStub.calledBefore(runner.run), true);
+                    });
+            });
+
             it('all asynchronous runner events', () => {
                 const runner = mkRunnerStub_();
                 const hermione = Hermione.create(makeConfigStub());
 
                 return hermione.run()
                     .then(() => {
-                        _.forEach(asyncEvents, (event, name) => {
+                        _.forEach(RunnerEvents.ASYNC, (event, name) => {
                             const spy = sinon.spy().named(`${name} handler`);
                             hermione.on(event, spy);
 
@@ -226,6 +234,22 @@ describe('hermione', () => {
 
                             assert.calledOnce(spy);
                         });
+                    });
+            });
+
+            it('asynchronous runner events before "Runner.run" called', () => {
+                const passEventsStub = sandbox.stub(utils, 'passthroughEventAsync');
+                const runner = mkRunnerStub_();
+                const hermione = Hermione.create(makeConfigStub());
+
+                return hermione.run()
+                    .then(() => {
+                        assert.calledWith(passEventsStub.firstCall,
+                            runner,
+                            sinon.match.instanceOf(Hermione),
+                            RunnerEvents.ASYNC
+                        );
+                        assert.equal(passEventsStub.calledBefore(runner.run), true);
                     });
             });
 
@@ -259,6 +283,23 @@ describe('hermione', () => {
                         signalHandler.emitAndWait('exit');
 
                         assert.calledOnce(onExit);
+                    });
+            });
+
+            it('exit event runner events before "Runner.run" called', () => {
+                const passEventsStub = sandbox.stub(utils, 'passthroughEventAsync');
+
+                const runner = mkRunnerStub_();
+                const hermione = Hermione.create(makeConfigStub());
+
+                return hermione.run()
+                    .then(() => {
+                        assert.calledWith(passEventsStub.secondCall,
+                            sinon.match.instanceOf(QEmitter),
+                            sinon.match.instanceOf(Hermione),
+                            RunnerEvents.EXIT
+                        );
+                        assert.equal(passEventsStub.calledBefore(runner.run), true);
                     });
             });
         });

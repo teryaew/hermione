@@ -170,19 +170,6 @@ describe('Runner', () => {
 
         describe('Mocha runners', () => {
             let mochaRunner;
-            const mochaRunnerEvents = [
-                RunnerEvents.SUITE_BEGIN,
-                RunnerEvents.SUITE_END,
-
-                RunnerEvents.TEST_BEGIN,
-                RunnerEvents.TEST_END,
-
-                RunnerEvents.TEST_PASS,
-                RunnerEvents.TEST_PENDING,
-
-                RunnerEvents.INFO,
-                RunnerEvents.WARNING
-            ];
 
             beforeEach(() => {
                 mochaRunner = mkMochaRunner();
@@ -209,34 +196,50 @@ describe('Runner', () => {
                 });
             });
 
-            it('should passthrough events', () => {
-                const runner = new Runner(makeConfigStub());
+            describe('events', () => {
+                const mochaRunnerEvents = [
+                    RunnerEvents.SUITE_BEGIN,
+                    RunnerEvents.SUITE_END,
 
-                return run_({runner})
-                    .then(() => {
-                        _.forEach(mochaRunnerEvents, (event, name) => {
-                            const spy = sinon.spy().named(`${name} handler`);
-                            runner.on(event, spy);
+                    RunnerEvents.TEST_BEGIN,
+                    RunnerEvents.TEST_END,
 
-                            mochaRunner.emit(event);
+                    RunnerEvents.TEST_PASS,
+                    RunnerEvents.TEST_PENDING,
 
-                            assert.calledOnce(spy);
+                    RunnerEvents.INFO,
+                    RunnerEvents.WARNING
+                ];
+
+                it('should passthrough events', () => {
+                    const runner = new Runner(makeConfigStub());
+
+                    return run_({runner})
+                        .then(() => {
+                            _.forEach(mochaRunnerEvents, (event, name) => {
+                                const spy = sinon.spy().named(`${name} handler`);
+                                runner.on(event, spy);
+
+                                mochaRunner.emit(event);
+
+                                assert.calledOnce(spy);
+                            });
                         });
-                    });
-            });
+                });
 
-            it('should passthrough events from mocha runners synchronously', () => {
-                const passEventsStub = sandbox.stub(utils, 'passthroughEvent');
-                const runner = new Runner(makeConfigStub());
+                it('should passthrough events from mocha runners synchronously', () => {
+                    const passEventsStub = sandbox.stub(utils, 'passthroughEvent');
+                    const runner = new Runner(makeConfigStub());
 
-                return run_({runner})
-                    .then(() => {
-                        assert.calledWith(passEventsStub.secondCall,
-                            sinon.match.instanceOf(QEmitter),
-                            sinon.match.instanceOf(Runner),
-                            mochaRunnerEvents
-                        );
-                    });
+                    return run_({runner})
+                        .then(() => {
+                            assert.calledWith(passEventsStub.secondCall,
+                                sinon.match.instanceOf(QEmitter),
+                                sinon.match.instanceOf(Runner),
+                                mochaRunnerEvents
+                            );
+                        });
+                });
             });
         });
 

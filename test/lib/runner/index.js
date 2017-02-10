@@ -3,7 +3,7 @@
 const q = require('q');
 const _ = require('lodash');
 const QEmitter = require('qemitter');
-const utils = require('qemitter/utils');
+const qUtils = require('qemitter/utils');
 
 const BrowserAgent = require('../../../lib/browser-agent');
 const BrowserPool = require('../../../lib/browser-pool');
@@ -228,12 +228,12 @@ describe('Runner', () => {
                 });
 
                 it('should passthrough events from mocha runners synchronously', () => {
-                    const passEventsStub = sandbox.stub(utils, 'passthroughEvent');
+                    sandbox.stub(qUtils, 'passthroughEvent');
                     const runner = new Runner(makeConfigStub());
 
                     return run_({runner})
                         .then(() => {
-                            assert.calledWith(passEventsStub.secondCall,
+                            assert.calledWith(qUtils.passthroughEvent,
                                 sinon.match.instanceOf(QEmitter),
                                 sinon.match.instanceOf(Runner),
                                 mochaRunnerEvents
@@ -266,12 +266,12 @@ describe('Runner', () => {
             });
 
             it('should passthrough SESSION_START and SESSION_END events asynchronously', () => {
-                const passEventsStub = sandbox.stub(utils, 'passthroughEventAsync');
+                sandbox.stub(qUtils, 'passthroughEventAsync');
                 const runner = new Runner(makeConfigStub());
 
                 return run_({runner})
                     .then(() => {
-                        assert.calledWith(passEventsStub.firstCall,
+                        assert.calledWith(qUtils.passthroughEventAsync,
                             sinon.match.instanceOf(BrowserAgent),
                             sinon.match.instanceOf(Runner), [
                                 RunnerEvents.SESSION_START,
@@ -331,11 +331,11 @@ describe('Runner', () => {
             });
 
             it('should synchrony passthrough necessary events', () => {
-                const passEventsStub = sandbox.stub(utils, 'passthroughEvent');
+                sandbox.stub(qUtils, 'passthroughEvent');
 
                 new Runner(makeConfigStub()); // eslint-disable-line no-new
 
-                assert.calledWith(passEventsStub.firstCall,
+                assert.calledWith(qUtils.passthroughEvent,
                     retryMgr,
                     sinon.match.instanceOf(Runner), [
                         RunnerEvents.TEST_FAIL,

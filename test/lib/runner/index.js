@@ -192,21 +192,37 @@ describe('Runner', () => {
             });
         });
 
-        it('should passthrough events from mocha runners', () => {
-            const mochaRunner = mkMochaRunner();
-            const runner = new Runner(makeConfigStub());
-            const onTestPass = sandbox.spy().named('onTestPass');
+        describe('passing events from from mocha runners', () => {
+            [
+                RunnerEvents.BEFORE_FILE_READ,
+                RunnerEvents.AFTER_FILE_READ,
 
-            runner.on(RunnerEvents.TEST_PASS, onTestPass);
-            return run_({runner})
-                .then(() => {
-                    mochaRunner.emit(RunnerEvents.TEST_PASS);
+                RunnerEvents.SUITE_BEGIN,
+                RunnerEvents.SUITE_END,
 
-                    assert.called(onTestPass);
+                RunnerEvents.TEST_BEGIN,
+                RunnerEvents.TEST_END,
+
+                RunnerEvents.TEST_PASS,
+                RunnerEvents.TEST_PENDING,
+
+                RunnerEvents.INFO,
+                RunnerEvents.WARNING
+            ].forEach((event) => {
+                it(`should passthrough ${event} from mocha runner`, () => {
+                    const mochaRunner = mkMochaRunner();
+                    const runner = new Runner(makeConfigStub());
+                    const spy = sandbox.spy();
+
+                    runner.on(event, spy);
+                    return run_({runner})
+                        .then(() => mochaRunner.emit(event))
+                        .then(() => assert.calledOnce(spy));
                 });
+            });
         });
 
-        describe('passing of events from browser agent', () => {
+        describe('passing events from browser agent', () => {
             beforeEach(() => sandbox.stub(BrowserAgent, 'create'));
 
             [RunnerEvents.SESSION_START, RunnerEvents.SESSION_END].forEach((event) => {

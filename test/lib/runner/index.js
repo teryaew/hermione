@@ -192,7 +192,7 @@ describe('Runner', () => {
             });
         });
 
-        describe('passing events from from mocha runners', () => {
+        describe('passing events from mocha runners', () => {
             [
                 RunnerEvents.BEFORE_FILE_READ,
                 RunnerEvents.AFTER_FILE_READ,
